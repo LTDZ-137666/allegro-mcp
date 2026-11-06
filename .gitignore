@@ -1,0 +1,72 @@
+# ---- build artifacts ----
+build/
+build-*/
+CMakeCache.txt
+CMakeFiles/
+*.dll
+*.so
+*.dylib
+*.o
+*.obj
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.egg-info/
+dist/
+*.whl
+
+# ---- python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- runtime artifacts ----
+*.log
+ipc_bridge.log
+vibe_in.il
+vibe_out.log
+workspace/
+
+# ---- PCB / design data: never commit customer or board assets ----
+*.brd
+*.dra
+*.psm
+*.pad
+*.sst
+*.art
+*.artwork
+*.gerber
+*.gbr
+*.drl
+*.exc
+*.tcfx
+*.scr
+*.pdf
+connector_map*
+*.kicad_pcb
+
+# ---- local env / secrets ----
+.env
+.env.*
+*.local
+secrets.*
+mcp.json
+cords.json
+
+# ---- editor / agent dirs ----
+.vscode/
+.idea/
+.claude/
+.cursor/
+.context/
+.agents/
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+desktop.ini

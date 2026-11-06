@@ -1,0 +1,12 @@
+{
+  "allegro-mcp": {
+      "command": "<PYTHON_EXE>",
+    "args": [
+        "<REPO>/python/allegro_mcp/server.py"
+    ],
+    "timeout": 1800,
+    "disabled": false,
+    "type": "stdio",
+    "enabled": true
+  }
+}
