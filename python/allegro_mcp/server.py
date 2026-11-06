@@ -178,96 +178,119 @@ def allegro_call(function: str, *args: str) -> str:
 def allegro_design_info() -> str:
     """Get basic information about the currently open PCB design.
 
-    Returns design name, units, accuracy, extents, and layer count.
+    Returns design name, units, net count, component count and extents.
     """
-    expr = """
-    (let (dsn)
-        dsn = axlDBGetDesign()
-        strcat("Design: " dsn->name "\\n"
-               "Units: " symbolToString(axlDBGetDesignUnits()) "\\n"
-               "Accuracy: " axlDBGetDesignAccuracy() "\\n"
-               "Extents: " axlDBGetExtents() "\\n"
-               "Layers: " length(axlGetAllLayers()) "\\n"
-               "Nets: " length(dsn->nets) "\\n"
-               "Components: " length(dsn->symbols)
-        )
+    # Two separate evals on purpose: combining axlCurrentDesign() with
+    # axlDBGetDesign() property access in one expression is slow enough to
+    # hit the transport timeout on large designs (verified on Allegro 25.1).
+    name = allegro_eval("axlCurrentDesign()")
+    stats = allegro_eval(
+        "(progn "
+        "(setq d axlDBGetDesign()) "
+        "(sprintf nil \"Nets: %d | Components: %d | Extents: %L\" "
+        "(length d->nets) (length d->symbols) d->bBox))"
     )
-    """
-    return allegro_eval(expr.strip())
+    return f"Design: {name}\n{stats}"
 
 @mcp.tool()
 def allegro_get_nets() -> str:
-    """Get a list of all net names in the current PCB design."""
-    expr = "(axlDBGetDesign())->nets~>name"
+    """Get a list of all net names in the current PCB design.
+
+    Uses list-level attribute flattening (``~>``) plus a single foreach pass.
+    Calling ``nth`` repeatedly over a ``~>`` result re-walks the database each
+    time and will time out on designs with many nets.
+    """
+    expr = (
+        "(progn "
+        "(setq l axlDBGetDesign()->nets~>name) "
+        "(setq out \"\") "
+        "(foreach x l out = strcat(out x \"|\")) "
+        "out)"
+    )
     return allegro_eval(expr)
 
 @mcp.tool()
 def allegro_get_net_info(net_name: str) -> str:
-    """Get detailed information about a specific net.
+    """Get information about a specific net.
 
     Args:
         net_name: The net name (e.g. "GND", "VCC", "CLK")
+
+    Resolution happens on the Python side over the flattened name list.
+    Walking ``d->nets`` inside SKILL to match one name re-walks the database
+    on every iteration and times out on large designs (verified 25.1).
+    Deep properties such as etch length are not exposed here; use
+    ``allegro_eval`` with the appropriate axl* call for that.
     """
-    expr = f"""
-    (let (net dsn)
-        dsn = axlDBGetDesign()
-        net = nil
-        foreach(n dsn->nets
-            when(n->name == "{net_name}"
-                net = n
-                return()
-            )
+    names = allegro_get_nets()
+    if names.startswith("Error") or names.startswith("Connection Error"):
+        return names
+    items = [x for x in names.split("|") if x]
+    if net_name in items:
+        return (
+            f"Name: {net_name}\n"
+            f"Index: {items.index(net_name)}\n"
+            f"Total nets on board: {len(items)}\n"
+            "Deep properties (etch length, diff pair) need a direct axl* call; "
+            "use allegro_eval."
         )
-        if(net then
-            strcat("Name: " net->name "\\n"
-                   "Branches: " length(net->branches) "\\n"
-                   "TotalEtchLength: " axlDBGetLength(net) "\\n"
-                   "DifferentialPair: " if(net->diffPair then "yes" else "no")
-            )
-        else
-            "Net '{net_name}' not found"
+    ci = [x for x in items if x.lower() == net_name.lower()]
+    if ci:
+        return (
+            f"Name: {ci[0]}  (matched case-insensitively)\n"
+            f"Index: {items.index(ci[0])}\n"
+            f"Total nets on board: {len(items)}"
         )
-    )
-    """
-    return allegro_eval(expr.strip())
+    return f"Net '{net_name}' not found among {len(items)} nets"
 
 @mcp.tool()
 def allegro_get_components() -> str:
-    """Get a list of all component reference designators (RefDes) in the design."""
-    expr = "(axlDBGetDesign())->symbols~>name"
+    """Get a list of all component reference designators (RefDes) in the design.
+
+    Note: uses ``~>refdes``. ``~>name`` on symbols returns the footprint
+    (package) name, not the RefDes, which is a different thing.
+    """
+    expr = (
+        "(progn "
+        "(setq l axlDBGetDesign()->symbols~>refdes) "
+        "(setq out \"\") "
+        "(foreach x l out = strcat(out x \"|\")) "
+        "out)"
+    )
     return allegro_eval(expr)
 
 @mcp.tool()
 def allegro_get_component_info(refdes: str) -> str:
-    """Get detailed information about a specific component.
+    """Get information about a specific component.
 
     Args:
         refdes: Component reference designator (e.g. "U1", "R5")
+
+    Same resolution strategy as get_net_info: match on the flattened RefDes
+    list on the Python side. Per-symbol geometry (xy / rotation / mirrored)
+    is not walked here because single-object attribute access is not
+    reliable across Allegro versions; use allegro_eval for that.
     """
-    expr = f"""
-    (let (sym dsn)
-        dsn = axlDBGetDesign()
-        sym = nil
-        foreach(s dsn->symbols
-            when(s->name == "{refdes}"
-                sym = s
-                return()
-            )
+    refs = allegro_get_components()
+    if refs.startswith("Error") or refs.startswith("Connection Error"):
+        return refs
+    items = [x for x in refs.split("|") if x]
+    if refdes in items:
+        return (
+            f"RefDes: {refdes}\n"
+            f"Index: {items.index(refdes)}\n"
+            f"Total components on board: {len(items)}\n"
+            "Geometry (xy / rotation / pins) needs a direct axl* call; "
+            "use allegro_eval."
         )
-        if(sym then
-            strcat("RefDes: " sym->name "\\n"
-                   "Location: " sym->xy "\\n"
-                   "Rotation: " sym->rotation "\\n"
-                   "Mirrored: " sym->isMirrored "\\n"
-                   "Package: " sym->package "\\n"
-                   "Pins: " length(sym->pins)
-            )
-        else
-            "Component '{refdes}' not found"
+    ci = [x for x in items if x.lower() == refdes.lower()]
+    if ci:
+        return (
+            f"RefDes: {ci[0]}  (matched case-insensitively)\n"
+            f"Index: {items.index(ci[0])}\n"
+            f"Total components on board: {len(items)}"
         )
-    )
-    """
-    return allegro_eval(expr.strip())
+    return f"Component '{refdes}' not found among {len(items)} components"
 
 @mcp.tool()
 def allegro_get_layers() -> str:

@@ -77,6 +77,13 @@ The SKILL side loads the DLL with `axlDllCall`, starts a TCP listener via `bridg
 
 A timer is used instead of a blocking socket read on purpose: blocking would freeze Allegro's GUI thread.
 
+## Verified environment
+
+- **Cadence Allegro 25.1** (32-bit plugin host) — the tool layer in this repo has been exercised against a real design on 25.1.
+- Earlier releases (17.4 and before) use a slightly different database attribute API. If a read tool returns `nil` or `SKILL eval error` on your version, see [docs/SKILL-TIPS.md](docs/SKILL-TIPS.md) — it lists which constructs are version-sensitive and how to narrow the cause.
+
+> `axl*` behaviour changes between major versions. Before upgrading Allegro, run the short verification list at the end of SKILL-TIPS to catch regressions early.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).

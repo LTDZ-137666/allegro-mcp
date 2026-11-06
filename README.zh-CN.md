@@ -163,6 +163,13 @@ powershell -ExecutionPolicy Bypass -File scripts/uninstall.ps1
 - **单连接。** 一个 Allegro 进程同时只服务一个 MCP 客户端。
 - **未做并发写保护。** AI 的连续调用之间请确认落库。
 
+## 实测环境
+
+- **Cadence Allegro 25.1**（32 位插件宿主）—— 本仓库的工具层已在 25.1 的真实设计上实际跑通。
+- 更早的版本（17.4 及以前）数据库属性 API 略有不同。如果某个读取类工具在你的版本上返回 `nil` 或 `SKILL eval error`，看 [docs/SKILL-TIPS.md](docs/SKILL-TIPS.md)，里面列了哪些写法对版本敏感、以及怎么定位原因。
+
+> `axl*` 的行为会随大版本变化。升级 Allegro 之前，建议先跑一遍 SKILL-TIPS 末尾的验证清单，能提前发现回归。
+
 ## License 与免责
 
 MIT，见 [LICENSE](LICENSE)。
